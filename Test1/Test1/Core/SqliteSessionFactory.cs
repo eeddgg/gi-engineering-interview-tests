@@ -1,13 +1,8 @@
 using System.Data;
 using System.Data.Common;
-using System.Threading;
-using System.Threading.Tasks;
-using Test1.Contracts;
-using Microsoft.AspNetCore.Hosting;
+using System.Reflection;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Test1.Contracts;
 using ISession = Test1.Contracts.ISession;
 
 // ReSharper disable ClassNeverInstantiated.Global
@@ -22,8 +17,6 @@ namespace Test1.Core
     /// </summary>
     internal class SqliteSessionFactory : ISessionFactory
     {
-        private const string _dbPath = @"Test1\bin\Debug\net10.0\data\Test1.db";
-
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<SqliteSessionFactory> _logger;
 
@@ -83,7 +76,7 @@ namespace Test1.Core
         /// <inheritdoc />
         public ISession CreateNewSession(bool readOnly, bool startTransaction = true)
         {
-            string connectionString = $"Data Source={_dbPath}";
+            string connectionString = $"Data Source={GetDatabaseFilePath()}";
 
             DbConnection connection = new SqliteConnection(connectionString);
 
@@ -94,12 +87,10 @@ namespace Test1.Core
 
         /// <inheritdoc />
         public async ValueTask<ISession> CreateNewSessionAsync(CancellationToken cancellationToken)
-        {
-            string connectionString = $"Data Source={_dbPath}";
+        {            
+            string connectionString = $"Data Source={GetDatabaseFilePath()}";
 
             DbConnection connection = new SqliteConnection(connectionString);
-
-            var cwd = System.IO.Directory.GetCurrentDirectory();
 
             await connection.OpenAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -120,6 +111,13 @@ namespace Test1.Core
             var txn = session.BeginTransaction(isolationLevel);
 
             return new DapperDbContext(session, txn);
+        }
+
+        private static string GetDatabaseFilePath()
+        {
+            string assemblyFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            return Path.Join(assemblyFolder, "data", "test1.db");
         }
     }
 }
