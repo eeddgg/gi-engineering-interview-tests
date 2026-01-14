@@ -29,13 +29,23 @@ namespace Test1.Controllers
 
             const string sql = @"
 SELECT
-    Guid,
-    Name,
-    Address,
-    City,
-    Locale,
-    PostalCode
-FROM location;";
+    l.UID,
+    l.Guid,
+    l.Name,
+    l.Address,
+    l.City,
+    l.Locale,
+    l.PostalCode,
+    COUNT(a.UID) as AccountCount
+    FROM location l LEFT JOIN account a ON a.LocationUid = l.UID
+    GROUP BY l.UID,
+    l.Guid,
+    l.Name,
+    l.Address,
+    l.City,
+    l.Locale,
+    l.PostalCode
+    ORDER BY AccountCount DESC;";
 
             var builder = new SqlBuilder();
 
@@ -178,6 +188,7 @@ INSERT INTO location (
             public string City {get;set;}
             public string Locale {get;set;}
             public string PostalCode {get;set;}
+            public int AccountCount{get; set;}
         }
     }
 }
