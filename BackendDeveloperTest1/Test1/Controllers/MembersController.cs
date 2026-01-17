@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Dapper;
 using Test1.Contracts;
 using Test1.Models;
+using System.Data;
 
 namespace Test1.Controllers
 {
@@ -15,6 +16,42 @@ namespace Test1.Controllers
             _sessionFactory = sessionFactory;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<MemberDto>>> List(CancellationToken cancellationToken)
+        {
+            var dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            
+            // I recommend not using reserved keywords as column identifiers, as it leads to errors during development
+            const string sql = @"SELECT 
+                Guid, AccountUid, LocationUid, `Primary`, 
+                JoinedDateUtc, CancelDateUtc, FirstName, LastName, 
+                Address, City, Locale, PostalCode, Cancelled
+            FROM member m";
+
+            
+            // get all members associated with the account
+            var rows = await dbContext.Session.QueryAsync<MemberDto>(sql, dbContext.Transaction).ConfigureAwait(false);
+
+            dbContext.Commit();
+
+            dbContext.Dispose();
+
+            foreach (MemberDto row in rows) {
+                dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+                var tempAccount = await AccountsController.GetAccountByUID(row.AccountUid, dbContext).ConfigureAwait(false);
+
+                row.account = tempAccount;
+
+            await dbContext.DisposeAsync();
+
+            }
+
+            return Ok(rows);
+        }
 
     }
 
@@ -44,5 +81,7 @@ namespace Test1.Controllers
         public string PostalCode { get; set; }
 
         public byte Cancelled { get; set; }
+
+        public AccountsController.AccountsDto account { get; set; }
     }
 }
