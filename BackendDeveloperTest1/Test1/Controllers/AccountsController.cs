@@ -54,7 +54,7 @@ namespace Test1.Controllers{
         }
 
         // since getting members requires getting the account, I pulled this into its own function
-        internal async Task<IEnumerable<AccountsDto>> QueryAccountByGUID(Guid id, CancellationToken cancellationToken, DapperDbContext dbContext)
+        internal static async Task<IEnumerable<AccountsDto>> QueryAccountByGUID(Guid id, CancellationToken cancellationToken, DapperDbContext dbContext)
         {
 
             // using the same Dapper relationship trick to get the account and location information in  a single query
@@ -93,8 +93,6 @@ namespace Test1.Controllers{
                 return account;
             }, splitOn: "LocationUID").ConfigureAwait(false);
 
-            dbContext.Commit();
-            await dbContext.DisposeAsync();
             return rows.FirstOrDefault();
         }
 
@@ -195,8 +193,35 @@ namespace Test1.Controllers{
         }
 
         [HttpGet("{id:Guid}/members")]
-        public async Task<ActionResult<IEnumerable<MemberDto>>> AccountMembers(Guid id, CancellationToken cancellationToken) {
+        public async Task<ActionResult<IEnumerable<MemberDto>>> AccountMembers(Guid id, CancellationToken cancellationToken)
+        {
+            IEnumerable<MemberDto> rows = await GetMembers(id, cancellationToken, _sessionFactory).ConfigureAwait(false);
+
+            return Ok(rows);
+        }
+
+        [HttpDelete("{id:Guid}/members")]
+        public async Task<ActionResult<MemberDto>> DeleteAllMembers(Guid id, CancellationToken cancellationToken)
+        {
+
+
             var dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
+               .ConfigureAwait(false);
+
+            AccountsDto account = (await QueryAccountByGUID(id, cancellationToken, dbContext)).FirstOrDefault();
+
+            dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
+               .ConfigureAwait(false);
+
+            int count = await dbContext.Session.ExecuteAsync("DELETE FROM member WHERE AccountUID = @AccountUID AND `Primary` <> 1", new { AccountUID=account.UID });
+            dbContext.Commit();
+            return Ok(count);
+        }
+
+        internal static async Task<IEnumerable<MemberDto>> GetMembers(Guid id, CancellationToken cancellationToken, ISessionFactory sf)
+        {
+
+            var dbContext = await sf.CreateContextAsync(cancellationToken)
                 .ConfigureAwait(false);
 
             // get account information
@@ -206,7 +231,7 @@ namespace Test1.Controllers{
             await dbContext.DisposeAsync();
 
             // reinitialize dbContext after committing transaction
-            dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
+            dbContext = await sf.CreateContextAsync(cancellationToken)
                 .ConfigureAwait(false);
 
             // I recommend not using reserved keywords as column identifiers, as it leads to errors during development
@@ -229,11 +254,12 @@ namespace Test1.Controllers{
 
             foreach (MemberDto row in rows)
             {
-                row.account = tempAccount;
+                row.Account = tempAccount;
             }
 
-            return Ok(rows);
+            return rows;
         }
+
         public class AccountsDto
         {
             public Int32? UID { get; set; }

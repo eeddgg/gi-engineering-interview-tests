@@ -38,6 +38,7 @@ SELECT
     l.PostalCode,
     COUNT(a.UID) as AccountCount
     FROM location l LEFT JOIN account a ON a.LocationUid = l.UID
+    WHERE a.Status < 3
     GROUP BY l.UID,
     l.Guid,
     l.Name,
