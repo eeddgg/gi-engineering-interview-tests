@@ -3,6 +3,8 @@ drop table "member";
 drop table "account";
 drop table "location";
 
+
+
 CREATE TABLE "location" (
   "UID" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
   "Guid" char(36) NOT NULL,
@@ -43,6 +45,7 @@ CREATE TABLE "member" (
   "LocationUid" int unsigned NOT NULL,
   "CreatedUtc" datetime NOT NULL,
   "UpdatedUtc" datetime DEFAULT NULL,
+  -- Why are we using a reserved keyword in SQLite as a column identifier? This just creates errors
   "Primary" tinyint NOT NULL,
   "JoinedDateUtc" datetime NOT NULL,
   "CancelDateUtc" datetime DEFAULT NULL,

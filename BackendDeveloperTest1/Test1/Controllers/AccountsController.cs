@@ -40,13 +40,13 @@ namespace Test1.Controllers{
             return Ok(rows);
 
         }
-        
+
         [HttpGet("{id:Guid}")]
         public async Task<ActionResult<IEnumerable<AccountsDto>>> GetByID(Guid id, CancellationToken cancellationToken)
         {
             await using var dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
                             .ConfigureAwait(false);
-
+            // split the functionality to get a specific account by GUID off as I reuse it in other methods
             IEnumerable<AccountsDto> rows = await QueryAccountByGUID(id, cancellationToken, dbContext).ConfigureAwait(false);
 
             return Ok(rows.FirstOrDefault());
@@ -86,7 +86,7 @@ namespace Test1.Controllers{
             FROM account a
             INNER JOIN location l ON a.LocationUID=l.UID 
             WHERE a.UID = '" + id + "'";
-
+            // using same dapper trick to get account and its associated location's information in one query
             var rows = await dbContext.Session.QueryAsync<AccountsDto, LocationsController.LocationDto, AccountsDto>(sql, (account, location) =>
             {
                 account.location = location;
@@ -102,11 +102,15 @@ namespace Test1.Controllers{
             await using var dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
                .ConfigureAwait(false);
 
+
+            // inserts all nonnull values, as the rest can be set through an update request
             const string sql = @"INSERT OR IGNORE INTO account 
             (LocationUid, Guid, CreatedUtc, Status, AccountType, PendCancel, 
                 PeriodStartUtc, PeriodEndUtc, NextBillingUtc)
             VALUES (@LocationUid, @Guid, @CreatedUtc, @Status, @accountType, 
                 @PendCancel, @PeriodStartUtc, @PeriodEndUtc, @NextBillingUtc);";
+
+            
             Guid id = Guid.NewGuid();
             var builder = new SqlBuilder();
             var template = builder.AddTemplate(sql, new
@@ -128,6 +132,7 @@ namespace Test1.Controllers{
 
             dbContext.Commit();
 
+            // returns the GUID of the new account if unique, otherwise returns a failure message
             return count == 1 ? Ok(id) : BadRequest("Unable to add Account");
         }
 
@@ -189,6 +194,8 @@ namespace Test1.Controllers{
             });
             var count = await dbContext.Session.ExecuteAsync(template.RawSql, template.Parameters, dbContext.Transaction);
             dbContext.Commit();
+
+            // returns the count of rows modified if it is correct, otherwise returns a 400 error.
             return count == 1 ? Ok(count) : BadRequest("Unable to update account");
         }
 
@@ -224,7 +231,7 @@ namespace Test1.Controllers{
             var dbContext = await sf.CreateContextAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            // get account information
+            // get account information from db
             var tempAccountList = await QueryAccountByGUID(id, cancellationToken, dbContext).ConfigureAwait(false);
             var tempAccount = tempAccountList.FirstOrDefault();
 
@@ -252,6 +259,7 @@ namespace Test1.Controllers{
 
             dbContext.Dispose();
 
+            // assign account info to member, for full visibility from the request, could be secured later
             foreach (MemberDto row in rows)
             {
                 row.Account = tempAccount;

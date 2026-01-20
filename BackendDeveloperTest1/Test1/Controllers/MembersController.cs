@@ -31,14 +31,14 @@ namespace Test1.Controllers
             FROM member m";
 
 
-            // get all members associated with the account
+            // get all members
             var rows = await dbContext.Session.QueryAsync<MemberDto>(sql, dbContext.Transaction).ConfigureAwait(false);
 
             dbContext.Commit();
 
             dbContext.Dispose();
 
-            // Map account to each member for display
+            // Map account to each member for completeness of information
             foreach (MemberDto row in rows)
             {
                 dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
@@ -67,8 +67,6 @@ namespace Test1.Controllers
 
 
             int primaryCount = (await dbContext.Session.QueryAsync<int>("SELECT COUNT('Primary') FROM member WHERE ('Primary' <> 0 AND AccountUid = @AccountUid)", new { member.AccountUid })).First();
-            
-
             dbContext.Commit();
             dbContext.Dispose();
 
@@ -138,17 +136,15 @@ namespace Test1.Controllers
                 await dbContext.DisposeAsync();
 
 
-                var member = (await AccountsController.GetMembers(acctGuid, cancellationToken, _sessionFactory)).FirstOrDefault();
-
                 // remakes dbContext for setting a new Primary user
                 dbContext = await _sessionFactory.CreateContextAsync(cancellationToken)
                     .ConfigureAwait(false);
 
                 // Grabs the next oldest user on the account and updates its Primary value
-                success = await dbContext.Session.ExecuteAsync("UPDATE member SET `Primary` = 1 WHERE CreatedUtc=(SELECT MIN(CreatedUtc) FROM member WHERE AccountUID=@AccountUID AND `Primary`= 0);", new { AccountUID=member.AccountUid });
+                success = await dbContext.Session.ExecuteAsync("UPDATE member SET `Primary` = 1 WHERE CreatedUtc=(SELECT MIN(CreatedUtc) FROM member WHERE AccountUID=@AccountUID AND `Primary`= 0);", new { AccountUID=acctUid });
                 dbContext.Commit();
 
-                // If no user is found, abort the deletion and inform the user
+                // If no other member is found, abort the deletion and inform the user, preventing the last user from being deleted
                 if (success != 1)
                 {
                     return BadRequest("Unable to set primary member, member not deleted");
